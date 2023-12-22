@@ -1,0 +1,390 @@
+<!-- index.html -->
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, 
+                   initial-scale=1.0">
+    <title>Rock Paper Scissor</title>
+</head>
+
+<body>
+    <section class="game">
+        <!--Title -->
+        <div class="title">Rock Paper Scissor</div>
+
+        <!--Display Score of player and computer -->
+        <div class="score">
+            <div class="playerScore">
+                <h2>Player</h2>
+                <p class="p-count count">0</p>
+
+            </div>
+            <div class="computerScore">
+                <h2>Computer</h2>
+                <p class="c-count count">0</p>
+
+            </div>
+        </div>
+
+        <!--Number of moves left before game ends -->
+        <div id="movesleft" class="movesleft">Lets Start</div>
+
+
+
+
+        <div id="countdown" class="item1"></div>
+
+        <button type="button" id="start_reload_button" onclick="newGame()">Start Game</button>
+        <div id="webcam-container"></div>
+        <div id="label-container"></div>
+        <div class="round_result"></div>
+        <div class="overall_result"></div>
+        <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+        <script type="text/javascript">
+            // More API functions here:
+            // https://github.com/googlecreativelab/teachablemachine-community/tree/master/libraries/image
+
+            // the link to your model provided by Teachable Machine export panel
+            const URL = "https://teachablemachine.withgoogle.com/models/-j5w7H_Q1/";
+
+            let model, webcam, labelContainer, maxPredictions;
+
+            let total_rounds = 5;
+            let playerScore = 0;
+            let computerScore = 0;
+            let moves = 0;
+
+            const round_result = document.querySelector('.round_result');
+            const result = document.querySelector('.overall_result');
+            const playerScoreBoard = document.querySelector('.p-count');
+            const computerScoreBoard = document.querySelector('.c-count');
+
+
+            movesLeft = document.getElementById("movesleft")
+
+            function newRound(){
+                var timeleft = 5;
+                var downloadTimer = setInterval(function(){
+                  if(timeleft <= 0){
+                    clearInterval(downloadTimer);
+                    document.getElementById("countdown").innerHTML = "Capture";
+                    onTimerKhatam();
+                  } else {
+                    document.getElementById("countdown").innerHTML = timeleft;
+                  }
+                  timeleft -= 1;
+                }, 1000);
+            }
+
+            function newGame(){
+                moves=0;
+                playerScore = 0;
+                computerScore = 0;
+                labelContainer.childNodes[0].innerHTML = '';
+                result.innerText = '';
+                round_result.innerText = '';
+                movesLeft.innerHTML = 'Moves left: '+total_rounds;
+                
+                start_reload_button.disabled = true;
+                start_reload_button.style.visibility = 'hidden';
+                updateScroeBoard();
+                newRound();
+            }
+
+            // Load the image model and setup the webcam
+            async function init() {
+
+                // const result = document.querySelector('.result');
+                // const playerScoreBoard = document.querySelector('.p-count');
+                // const computerScoreBoard = document.querySelector('.c-count');
+
+                movesLeft.innerHTML = 'Initializing camera. Setting up game!';
+
+                start_reload_button = document.getElementById('start_reload_button');
+                start_reload_button.disabled = true;
+                start_reload_button.style.visibility = 'hidden';
+                
+                const modelURL = URL + "model.json";
+                const metadataURL = URL + "metadata.json";
+                // 
+
+                // load the model and metadata
+                // Refer to tmImage.loadFromFiles() in the API to support files from a file picker
+                // or files from your local hard drive
+                // Note: the pose library adds "tmImage" object to your window (window.tmImage)
+                model = await tmImage.load(modelURL, metadataURL);
+                maxPredictions = model.getTotalClasses();
+
+                // Convenience function to setup a webcam
+                const flip = true; // whether to flip the webcam
+                webcam = new tmImage.Webcam(200, 200, flip); // width, height, flip
+                await webcam.setup(); // request access to the webcam
+                console.log('setup complete for camera access');
+                await webcam.play();
+                window.requestAnimationFrame(loop);
+
+                // append elements to the DOM
+                document.getElementById("webcam-container").appendChild(webcam.canvas);
+                labelContainer = document.getElementById("label-container");
+                labelContainer.appendChild(document.createElement("div"));
+                start_reload_button.disabled = false;
+                start_reload_button.style.visibility = 'visible';
+                
+                movesLeft.innerHTML = 'Moves left: '+(total_rounds);
+
+                // for (let i = 0; i < maxPredictions; i++) { // and class labels
+                //     labelContainer.appendChild(document.createElement("div"));
+                // }
+            }
+
+            function get_computers_prediction(){
+                const computerOptions = ['rock','paper','scissors'];
+                const choiceNumber = Math.floor(Math.random()*3);
+                const computerChoice = computerOptions[choiceNumber];
+                return computerChoice
+            }
+
+            async function loop() {
+                webcam.update(); // update the webcam frame
+                window.requestAnimationFrame(loop);
+            }
+
+            // run the webcam image through the image model
+            async function predict() {
+                // predict can take in an image, video or canvas html element
+                const prediction = await model.predict(webcam.canvas);
+                var max_prob = 0;
+                var predicted = '';
+                for (let i = 0; i < maxPredictions; i++) {
+                    // const classPrediction =
+                    if(prediction[i].probability>max_prob){
+                        max_prob = prediction[i].probability;
+                        predicted = prediction[i].className;
+                    }
+                    
+                }
+                labelContainer.childNodes[0].innerHTML = predicted;
+                return predicted;
+            }
+
+
+            async function onTimerKhatam(){
+                const computer_pred = get_computers_prediction();
+                console.log('d: computrer pred is '+computer_pred);
+                let player_pred = await predict();
+                console.log('d: player pred is '+player_pred);
+                player_pred = player_pred.toLowerCase();
+                winner(player_pred,computer_pred);
+                moves += 1;
+                    movesLeft.innerHTML = 'Moves left: '+(total_rounds-moves)
+
+                    if(moves>=total_rounds){
+                        gameOver();
+                    }else{
+                        newRound();
+                    }
+            }
+
+            function score(player, computer){
+                console.log('d: inside score with '+player+' and '+computer);
+                var m = {'rock':'scrissors','paper':'rock','scissors':'paper'};
+                if(player == computer)return 0;
+                else if(m[player] == computer)return 1;
+                else return 2;
+            }
+
+            function updateScroeBoard(){
+                playerScoreBoard.textContent = playerScore;
+                computerScoreBoard.textContent = computerScore;
+            }
+
+            // Function to decide winner
+            function winner(player,computer){
+                
+                let this_round_score = score(player,computer);
+                console.log('score for round '+moves+' is '+this_round_score);
+                if(this_round_score==0){
+                    round_result.textContent = 'Tie'
+                }
+                else if(this_round_score==1){
+                    round_result.textContent = 'You won round '+moves
+                    playerScore++;
+                }
+                else{
+                    round_result.textContent = 'Computer Won round '+moves
+                    computerScore++;
+                }
+                updateScroeBoard();
+            }
+            
+            
+            
+            // Function to run when game is over
+            const gameOver = () => {
+            
+                // const chooseMove = document.querySelector('.move');
+                // const reloadBtn = document.querySelector('.reload');
+            
+                // playerOptions.forEach(option => {
+                //     option.style.display = 'none';
+                // })
+            
+             
+                movesLeft.innerText = 'Game Over!!'
+                // movesLeft.style.display = 'none';
+                result.style.fontSize = '2rem';
+                result.style.color = 'grey'
+            
+                if(playerScore > computerScore){
+                    
+                    result.innerText = 'You Won The Game'
+                    // result.style.color = '#308D46';
+                }
+                else if(playerScore < computerScore){
+                    // result.style.fontSize = '2rem';
+                    result.innerText = 'You Lost The Game';
+                    // result.style.color = 'red';
+                }
+                else{
+                    // result.style.fontSize = '2rem';
+                    result.innerText = 'Tie';
+                    
+                }
+
+                start_reload_button.disabled = false;
+                start_reload_button.innerHTML = 'New game';
+                start_reload_button.style.visibility = 'visible';
+                // reloadBtn.innerText = 'Restart';
+                // reloadBtn.style.display = 'flex'
+                // reloadBtn.addEventListener('click',() => {
+                //     window.location.reload();
+                // })
+            }
+            
+
+            init();
+            
+            // Calling playGame function inside game
+            // playGame();
+
+        </script>
+
+
+        <!--Final result of game -->
+        
+
+        <!--Reload the game -->
+        <!-- <button class="reload"></button> -->
+
+    </section>
+
+    <!-- <script src="app.js"></script> -->
+</body>
+
+</html>
+<style>
+    /* styles.css */
+    /* universal selector - Applies to whole document */
+    *{
+    padding: 0;
+    margin: 0;
+    box-sizing: border-box;
+    background: #082c6c;
+    color: #fff;
+    }
+    /* To center everything in game */
+    .game{
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    width: 100vw;
+    justify-content: center;
+    align-items: center;
+    }
+    
+    /* Title of the game */
+    .title{
+    position: absolute;
+    top: 0;
+    font-size: 4rem;
+    z-index: 2;
+    }
+    
+    /* Score Board */
+    .score{
+    display: flex;
+    width: 30vw;
+    justify-content: space-evenly;
+    position: absolute;
+    top: 70px;
+    z-index: 1;
+    }
+    
+    /* Score  */
+    .p-count,.c-count{
+    text-align: center;
+    font-size: 1.5rem;
+    margin-top: 1rem;
+    }
+    
+    /* displaying three buttons in one line */
+    .options{
+    display: flex;
+    width: 50vw;
+    justify-content: space-evenly;
+    margin-top: 2rem;
+    }
+    
+    /* Styling on all three buttons */
+    .rock, .paper, .scissor{
+    padding: 0.8rem;
+    width: 100px;
+    border-radius: 10px;
+    background: green;
+    outline: none;
+    border-color: green;
+    border: none;
+    cursor: pointer;
+    }
+    
+    .move{
+    font-size: 2rem;
+    font-weight: bold;
+    }
+    
+    /* Reload button style */
+    .reload {
+    display: none;
+    margin-top: 2rem;
+    padding: 1rem;
+    background: green;
+    outline: none;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    }
+    
+    .result{
+    margin-top: 20px;
+    font-size: 1.2rem;
+    }
+    
+    /* Responsive Design */
+    @media screen and (max-width: 612px)
+    {  
+    .title{
+        text-align: center;
+    }
+    .score{
+        position: absolute;
+        top: 200px;
+        width: 100vw;
+    }
+    .options{
+        width: 100vw;
+    }
+</style>
